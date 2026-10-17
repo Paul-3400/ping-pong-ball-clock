@@ -1,6 +1,6 @@
 # Ping-Pong-Ball Uhr - Projektbeschreibung
 
-**Autor:** Paul Simmen mit Vibe (GLM-5-latest-short), 14.09.2026 - aktualisiert 14.10.2026
+**Autor:** Paul Simmen mit Vibe (GLM-5-latest-short), 14.09.2026 - aktualisiert 17.10.2026
 
 ## 📌 Projektübersicht
 
@@ -8,7 +8,7 @@ Eine kreative Uhr, die die Zeit mit 9 Ping-Pong-Bällen (40mm Durchmesser) anzei
 
 Zusätzlich zur Ping-Pong-Ball-Anzeige wird die Zeit auf einer **TM1637 6-Zahlen 7-Segment-Anzeige** (0,36 Zoll) angezeigt.
 
-**Status (14.10.2026):** Die komplette Anzeigelogik ist als Prototyp in Wokwi getestet (Seeed XIAO ESP32-S3). Der getestete Code liegt im Ordner [`wokwi/`](wokwi/) - Details siehe Abschnitt «WokWi-Prototyp-Test» weiter unten.
+**Status (17.10.2026):** Die komplette Anzeigelogik ist als Prototyp in Wokwi getestet (Seeed XIAO ESP32-S3). Der getestete Code liegt im Ordner [`wokwi/`](wokwi/) - Details siehe Abschnitt «WokWi-Prototyp-Test» weiter unten. Die Speisung ist ausgelegt: **Netzteil 5V/3A mit Schottky-Diode vor dem 5V-Pin** (Abschnitt «Stromversorgung»).
 
 ### 🎯 Ziele
 
@@ -30,6 +30,8 @@ Zusätzlich zur Ping-Pong-Ball-Anzeige wird die Zeit auf einer **TM1637 6-Zahlen
 | 7-Segment-Anzeige | 1     | TM1637 6-Zahlen, 0,36 Zoll                     |
 | Taster            | 3     | Stunde+, Minute+, Demo/Uhrzeit stellen         |
 | Netzteil          | 1     | 5V, 3A                                         |
+| Schottky-Diode   | 1     | 1N5819 oder SS14 (USB-Rückstrom-Schutz)       |
+| Elko             | 1     | 470-1000µF an der 5V-Schiene (LED-Stabilität) |
 | Gehäuse           | 1     | Für mechanische Fixierung der Bälle            |
 | Verdrahtung       | -     | Jumper-Kabel, Lötmaterial                      |
 | Widerstände       | 1-2   | 220-470Ω für LED-Strombegrenzung (falls nötig) |
@@ -99,6 +101,9 @@ Die 9 Ping-Pong-Bälle sind in einer 3x3-Matrix angeordnet:
 ### Verbindungsschema
 
 ```
+Netzteil 5V/3A (+) ──[Schottky-Diode 1N5819, Anode zum Netzteil]──► 5V-Pin
+Netzteil (-) ──────────────────────────────────────────────► gemeinsame GND-Schiene
+
 ┌─────────────────────────────────────────────────────────────┐
 │                    Mikrocontroller (RasPi/XIAO ESP32-S3)      │
 └─────────────────────────────────────────────────────────────┘
@@ -309,6 +314,8 @@ pip3 install rpi_ws281x requests
 
 **Dateien:** [`wokwi/sketch.ino`](wokwi/sketch.ino) · [`wokwi/diagram.json`](wokwi/diagram.json) · [`wokwi/libraries.txt`](wokwi/libraries.txt) (Adafruit NeoPixel, TM1637)
 
+**Update 17.10.2026 (diagram.json):** Netzteil-Gruppe ergänzt - Schiebeschalter `swPsu` (steht für den Plus-Pol des Netzteils, Griff links = EIN), Schottky-Diode als Community-Chip `chip-diode` (Dependency `github:drf5n/Wokwi-Chip-Diode@1.0.0`, Pins ANODE/CATHODE) sowie Beschriftungstexte. Ausserdem GND-Kette vervollständigt (np5→np6) und Titel-Text-Encoding repariert. In der Simulation bleibt der Netzteil-Zweig stromlos - Wokwi versorgt das Board virtuell über USB.
+
 ---
 
 ## ⚡ Stromversorgung
@@ -330,6 +337,25 @@ pip3 install rpi_ws281x requests
 - Neopixel-Strom als Daisy-Chain von Ball zu Ball führen (wie getestet), Daten über DOUT → DIN
 - 220-470Ω in der NeoPixel-Datenleitung und 1000µF Kondensator am Netzteilausgang
 - Ausreichend dicke Kabel (mind. 20AWG)
+- **Beim XIAO ESP32-S3: Schottky-Diode (1N5819/SS14) zwischen Netzteil-Plus und 5V-Pin** - siehe eigener Unterabschnitt unten
+
+### Speisung am XIAO ESP32-S3: Schottky-Diode ist Pflicht (17.10.2026)
+
+Der 5V-Pin des XIAO ESP32-S3 hängt intern direkt an der USB-Betriebsspannung (VBUS) - das Board hat **keine** eingebaute Schutzdiode gegen Rück speisung. Liegt das Netzteil direkt am 5V-Pin und du steckst gleichzeitig USB an (z.B. zum Umprogrammieren), fliesst Strom vom Netzteil zurück in den USB-Port des Computers - das kann den Port beschädigen («Backfeeding»).
+
+**Lösung:** Schottky-Diode in Serie zwischen Netzteil-Plus und 5V-Pin:
+
+```
+Netzteil 5V/3A (+) ──►|[ 1N5819 / SS14 ]|── 5V-Pin XIAO
+                    Anode   Kathode (Ring)
+```
+
+- **Anode zum Netzteil, Kathode (Ring) zum 5V-Pin** - so darfst du jederzeit USB anstöpseln, während die Uhr am Netzteil läuft
+- Spannungsabfall ca. 0,2-0,3 V - unkritisch für den Bordspannungsregler des XIAO
+- Netzteil-GND zwingend mit der gemeinsamen GND-Schiene verbinden (USB-GND, XIAO-GND, LEDs, TM1637 - alles eine Masse)
+- Im WokWi-Diagramm abgebildet als Schiebeschalter `swPsu` + `chip-diode`; die Diode ist dort ein Community-Chip, der über die `dependencies` in der diagram.json geladen wird
+
+Quelle: [Seeed Studio Wiki - XIAO ESP32-S3 (Empfehlung: Diode zwischen externer Quelle und 5V-Pin)](https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/)
 
 ---
 
@@ -411,6 +437,7 @@ pip3 install rpi_ws281x requests
 
 - **14.09.2026:** Erstversion - Projektbeschreibung, Code für RasPi und ESP32
 - **14.10.2026:** Wertemengen der Zeitzerlegung vervollständigt (Lücken behoben: Stunden 11-15, Minuten 35-47); Pin-Belegung für Seeed XIAO ESP32-S3 ergänzt (GPIO18 → D3/GPIO4, Taster D0/D1/D2); WokWi-Prototyp-Test erfolgreich, Ordner `wokwi/` hinzugefügt; Beispiel 06:20 korrigiert ((3,2) leuchtet gelb, nicht grün)
+- **17.10.2026:** Speisung ergänzt und ausgelegt: Netzteil 5V/3A mit Schottky-Diode (1N5819/SS14) vor dem XIAO-5V-Pin (USB-Rückstrom-Schutz, siehe Abschnitt «Stromversorgung»); WokWi-diagram.json um Netzteil-Gruppe + Dioden-Chip (chip-diode-Dependency) erweitert und GND-Kette np5→np6 vervollständigt
 
 ---
 
@@ -436,6 +463,8 @@ pip3 install rpi_ws281x requests
 - [Wokwi: diagram.json-Format (Verbindungen, Draht-Führung)](https://docs.wokwi.com/diagram-format)
 - [Wokwi: TM1637-Modul](https://docs.wokwi.com/parts/wokwi-tm1637-7segment)
 - [Wokwi: NeoPixel-Modul](https://docs.wokwi.com/parts/wokwi-neopixel)
+- [Seeed Studio Wiki - XIAO ESP32-S3 Getting Started (Speisung über den 5V-Pin)](https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/)
+- [Wokwi-Chip-Diode - Community-Custom-Chip (MIT)](https://github.com/drf5n/Wokwi-Chip-Diode)
 
 ---
 
