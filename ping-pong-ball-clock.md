@@ -341,7 +341,7 @@ pip3 install rpi_ws281x requests
 
 ### Speisung am XIAO ESP32-S3: Schottky-Diode ist Pflicht (17.10.2026)
 
-Der 5V-Pin des XIAO ESP32-S3 hängt intern direkt an der USB-Betriebsspannung (VBUS) - das Board hat **keine** eingebaute Schutzdiode gegen Rück speisung. Liegt das Netzteil direkt am 5V-Pin und du steckst gleichzeitig USB an (z.B. zum Umprogrammieren), fliesst Strom vom Netzteil zurück in den USB-Port des Computers - das kann den Port beschädigen («Backfeeding»).
+Der 5V-Pin des XIAO ESP32-S3 hängt intern direkt an der USB-Betriebsspannung (VBUS) - das Board hat **keine** eingebaute Schutzdiode gegen Rückspeisung. Liegt das Netzteil direkt am 5V-Pin und du steckst gleichzeitig USB an (z.B. zum Umprogrammieren), fliesst Strom vom Netzteil zurück in den USB-Port des Computers - das kann den Port beschädigen («Backfeeding»).
 
 **Lösung:** Schottky-Diode in Serie zwischen Netzteil-Plus und 5V-Pin:
 
