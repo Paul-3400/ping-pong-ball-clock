@@ -8,7 +8,7 @@ Eine kreative Uhr, die die Zeit mit 9 Ping-Pong-Bällen (40mm Durchmesser) anzei
 
 Zusätzlich zur Ping-Pong-Ball-Anzeige wird die Zeit auf einer **TM1637 6-Zahlen 7-Segment-Anzeige** (0,36 Zoll) angezeigt.
 
-**Status (17.10.2026):** Die komplette Anzeigelogik ist als Prototyp in Wokwi getestet (Seeed XIAO ESP32-S3). Der getestete Code liegt im Ordner [`wokwi/`](wokwi/) - Details siehe Abschnitt «WokWi-Prototyp-Test» weiter unten. Die Speisung ist ausgelegt: **Netzteil 5V/3A mit Schottky-Diode vor dem 5V-Pin** (Abschnitt «Stromversorgung»).
+**Status (17.10.2026):** Die komplette Anzeigelogik ist als Prototyp in Wokwi getestet (Seeed XIAO ESP32-S3). Der getestete Code liegt im Ordner [`wokwi/`](wokwi/) - Details siehe Abschnitt «WokWi-Prototyp-Test» weiter unten. Die Speisung ist ausgelegt: **Netzteil 5V/3A** - LEDs und TM1637-Anzeige hängen direkt am Netzteil-Rail, der XIAO wird über eine **Schottky-Diode** versorgt (Abschnitt «Stromversorgung»).
 
 ### 🎯 Ziele
 
@@ -101,16 +101,18 @@ Die 9 Ping-Pong-Bälle sind in einer 3x3-Matrix angeordnet:
 ### Verbindungsschema
 
 ```
-Netzteil 5V/3A (+) ──[Schottky-Diode 1N5819, Anode zum Netzteil]──► 5V-Pin
+Netzteil 5V/3A (+) ──┬──────────────────────────────► TM1637 VCC + NeoPixel-Kette (5V-Rail, direkt)
+                     └──[Schottky-Diode 1N5819]──► 5V-Pin XIAO (Anode zum Netzteil, Ring zum Board)
 Netzteil (-) ──────────────────────────────────────────────► gemeinsame GND-Schiene
 
 ┌─────────────────────────────────────────────────────────────┐
 │                    Mikrocontroller (RasPi/XIAO ESP32-S3)      │
 └─────────────────────────────────────────────────────────────┘
                               │
-                              ├── 5V ────┬─────────────┐
-                              │           ├── TM1637 VCC │
-                              │           └─────────────┘
+                              ├── 5V ──── (XIAO-Speisung: vom Netzteil-Rail über die Schottky-Diode)
+                              │
+                              │            TM1637 VCC + NeoPixel 5V/GND: direkt am
+                              │            Netzteil-Rail (vor der Diode), nicht am Board-5V-Pin
                               │
                               ├── GND ──┬─────────────┐
                               │           ├── TM1637 GND │
@@ -314,7 +316,7 @@ pip3 install rpi_ws281x requests
 
 **Dateien:** [`wokwi/sketch.ino`](wokwi/sketch.ino) · [`wokwi/diagram.json`](wokwi/diagram.json) · [`wokwi/libraries.txt`](wokwi/libraries.txt) (Adafruit NeoPixel, TM1637)
 
-**Update 17.10.2026 (diagram.json):** Netzteil-Gruppe ergänzt - Schiebeschalter `swPsu` (steht für den Plus-Pol des Netzteils, Griff links = EIN), Schottky-Diode als Community-Chip `chip-diode` (Dependency `github:drf5n/Wokwi-Chip-Diode@1.0.0`, Pins ANODE/CATHODE) sowie Beschriftungstexte. Ausserdem GND-Kette vervollständigt (np5→np6) und Titel-Text-Encoding repariert. In der Simulation bleibt der Netzteil-Zweig stromlos - Wokwi versorgt das Board virtuell über USB.
+**Update 17.10.2026 (diagram.json):** Netzteil-Gruppe ergänzt - Schiebeschalter `swPsu` (steht für den Plus-Pol des Netzteils, Griff links = EIN), Schottky-Diode als Community-Chip `chip-diode` (Dependency `github:drf5n/Wokwi-Chip-Diode@1.0.0`, Pins ANODE/CATHODE) sowie Beschriftungstexte. Ausserdem GND-Kette vervollständigt (np5→np6) und Titel-Text-Encoding repariert. In der Simulation bleibt der Netzteil-Zweig stromlos - Wokwi versorgt das Board virtuell über USB. **Nachtrag (17.10.2026):** Speisung umverdrahtet - TM1637 und NeoPixel-Kette speisen sich jetzt direkt vom Netzteil-Rail (`tm:VCC` → `dio:ANODE` bzw. `tm:VCC` → `np7:VDD`); der XIAO bleibt über die Diode am 5V-Pin.
 
 ---
 
@@ -354,6 +356,8 @@ Netzteil 5V/3A (+) ──►|[ 1N5819 / SS14 ]|── 5V-Pin XIAO
 - Spannungsabfall ca. 0,2-0,3 V - unkritisch für den Bordspannungsregler des XIAO
 - Netzteil-GND zwingend mit der gemeinsamen GND-Schiene verbinden (USB-GND, XIAO-GND, LEDs, TM1637 - alles eine Masse)
 - Im WokWi-Diagramm abgebildet als Schiebeschalter `swPsu` + `chip-diode`; die Diode ist dort ein Community-Chip, der über die `dependencies` in der diagram.json geladen wird
+
+**Aktuelle Aufteilung (Stand 17.10.2026, diagram.json):** TM1637 und die NeoPixel-Kette hängen **direkt am Netzteil-Rail** (vor der Diode), nur der XIAO wird über die Diode versorgt. Vorteile: Die Diode führt ausschliesslich den kleinen XIAO-Strom, und die LEDs erhalten die volle Netzteil-Spannung ohne Diode-Abfall. Hinweis: Bei USB-Betrieb mit ausgeschaltetem Netzteil bleiben LEDs und Anzeige stromlos, während der XIAO weiterläuft - beim Umprogrammieren also idealerweise das Netzteil eingeschaltet lassen, damit keine Datensignale an unversorgten Bausteinen anliegen.
 
 Quelle: [Seeed Studio Wiki - XIAO ESP32-S3 (Empfehlung: Diode zwischen externer Quelle und 5V-Pin)](https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/)
 
@@ -438,6 +442,7 @@ Quelle: [Seeed Studio Wiki - XIAO ESP32-S3 (Empfehlung: Diode zwischen externer 
 - **14.09.2026:** Erstversion - Projektbeschreibung, Code für RasPi und ESP32
 - **14.10.2026:** Wertemengen der Zeitzerlegung vervollständigt (Lücken behoben: Stunden 11-15, Minuten 35-47); Pin-Belegung für Seeed XIAO ESP32-S3 ergänzt (GPIO18 → D3/GPIO4, Taster D0/D1/D2); WokWi-Prototyp-Test erfolgreich, Ordner `wokwi/` hinzugefügt; Beispiel 06:20 korrigiert ((3,2) leuchtet gelb, nicht grün)
 - **17.10.2026:** Speisung ergänzt und ausgelegt: Netzteil 5V/3A mit Schottky-Diode (1N5819/SS14) vor dem XIAO-5V-Pin (USB-Rückstrom-Schutz, siehe Abschnitt «Stromversorgung»); WokWi-diagram.json um Netzteil-Gruppe + Dioden-Chip (chip-diode-Dependency) erweitert und GND-Kette np5→np6 vervollständigt
+- **17.10.2026 (Nachtrag):** Speisung umverdrahtet: TM1637 und NeoPixel-Kette direkt am Netzteil-Rail, XIAO weiterhin über die Schottky-Diode (USB-Schutz bleibt erhalten); Verbindungsschema und Speisungs-Abschnitt angepasst
 
 ---
 
